@@ -8,12 +8,15 @@ const LM_ICON: Record<string, string> = {
   vidhana: '🏛️', stadium: '🏏', park: '🌳', glasshouse: '🌺', tower: '🏙️', busstand: '🚌', palace: '🏰', temple: '🛕', lake: '💧', techpark: '💻', pyramid: '🔷', mall: '🛍️',
 };
 
-interface Lbl { obj: CSS2DObject; el: HTMLDivElement; kind: 'area' | 'lm' | 'road' | 'node' | 'dest' | 'stn'; name: { en: string; kn: string }; icon?: string; minD: number; maxD: number }
+export type LabelKind = 'area' | 'lm' | 'road' | 'node' | 'dest' | 'stn';
+interface Lbl { obj: CSS2DObject; el: HTMLDivElement; kind: LabelKind; name: { en: string; kn: string }; icon?: string; minD: number; maxD: number }
 
 export class Labels {
   renderer = new CSS2DRenderer();
   group = new THREE.Group();
   private items: Lbl[] = [];
+  /** Label kinds switched off in Show on map. */
+  hidden = new Set<LabelKind>();
 
   constructor(container: HTMLElement, net: Network) {
     this.renderer.setSize(container.clientWidth, container.clientHeight);
@@ -69,7 +72,7 @@ export class Labels {
       const real = Math.hypot(p.x - cp.x, p.y - cp.y, p.z - cp.z);
       const d = Math.max(camDist, real * 0.8);
       // near the ground only nearby labels make sense (keeps street view clean)
-      const vis = d >= it.minD && d <= it.maxD && !(cp.y < 60 && real > (it.kind === 'dest' ? 600 : it.kind === 'area' ? 350 : 220)) && !(it.kind === 'dest' && real < 170);
+      const vis = !this.hidden.has(it.kind) && d >= it.minD && d <= it.maxD && !(cp.y < 60 && real > (it.kind === 'dest' ? 600 : it.kind === 'area' ? 350 : 220)) && !(it.kind === 'dest' && real < 170);
       if (it.kind === 'area') it.el.style.opacity = camDist < 110 ? '0' : camDist < 260 ? String((camDist - 110) / 150) : '1';
       it.obj.visible = vis;
     }

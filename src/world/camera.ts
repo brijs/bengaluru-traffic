@@ -22,6 +22,15 @@ export class CameraRig {
     const a = this.rot ? this.rot.to : this.azimuth();
     this.rot = { t: 0, dur: 0.55, from: this.azimuth(), to: a + delta };
   }
+  /** Rotate immediately (compass drag). */
+  spin(delta: number) {
+    if (this.isChase()) return;
+    this.rot = null;
+    const c = this.controls, tg = c.target, p = this.camera.position;
+    const a = this.azimuth() + delta, rad = Math.hypot(p.x - tg.x, p.z - tg.z);
+    p.x = tg.x + Math.sin(a) * rad; p.z = tg.z + Math.cos(a) * rad;
+    this.camera.lookAt(tg);
+  }
   northUp() {
     if (this.isChase()) return;
     const a = this.azimuth();

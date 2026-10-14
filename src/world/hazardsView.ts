@@ -28,6 +28,8 @@ export class HazardsView {
   group = new THREE.Group();
   private entries = new Map<number, Entry>();
   markersOn = true;
+  /** Slider categories whose markers are switched off. */
+  hiddenCats = new Set<string>();
   onRemoved?: (h: Hazard, x: number, z: number) => void;
 
   constructor(private net: Network, private sim: Sim) {}
@@ -184,7 +186,7 @@ export class HazardsView {
       for (const c of e.g.children) if (c !== e.marker) c.scale.setScalar(s);
       const linkLevel = e.h.kind === 'dark' || e.h.kind === 'faded' || e.h.kind === 'nofoot';
       const far = low && Math.hypot(e.h.x - cam!.x, e.h.z - cam!.z) > 160;
-      e.marker.visible = this.markersOn && showFar && !far && (!linkLevel || showLinkLevel);
+      e.marker.visible = this.markersOn && !this.hiddenCats.has(SLIDER_BY_ID[e.h.slider]?.cat ?? 'road') && showFar && !far && (!linkLevel || showLinkLevel);
       const pulse = 1 + Math.sin(wallT * 4 + id) * 0.06 + (e.h.ghost ? Math.sin(wallT * 8) * 0.12 : 0);
       e.marker.scale.set(0.042 * pulse, 0.049 * pulse, 1);
       if (e.h.kind === 'puddle') {

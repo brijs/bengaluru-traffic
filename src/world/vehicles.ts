@@ -155,6 +155,8 @@ export class Vehicles {
   private m = new THREE.Matrix4(); private q = new THREE.Quaternion(); private e = new THREE.Euler(); private v = new THREE.Vector3(); private sc = new THREE.Vector3(); private c = new THREE.Color();
   highlight = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.2, 32), new THREE.MeshBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.9, depthWrite: false }));
   followId = -1; hideId = -1;
+  /** Show on map switches (your own car always stays visible). */
+  show = { vehicles: true, people: true, bubbles: true };
 
   constructor(private sim: Sim) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -232,6 +234,10 @@ export class Vehicles {
 
   private iconT = 0;
   update(dt: number, time: number, camera: THREE.Camera, focus: THREE.Vector3, camDist: number) {
+    const sv = this.show.vehicles;
+    this.meshes.forEach((m, t) => (m.visible = sv || t === VT.PLAYER));
+    for (const m of [this.torso, this.head, this.helmet, this.rods, this.siren, this.headGlow, this.tailGlow, this.blob]) m.visible = sv;
+    for (const m of [this.pedBody, this.pedHead, this.cows]) m.visible = this.show.people;
     const sim = this.sim;
     const counts = new Array(9).fill(0);
     let nb = 0, nRod = 0, nGlow = 0, nSir = 0, nBlob = 0;
@@ -383,6 +389,7 @@ export class Vehicles {
   private assignIcons(focus: THREE.Vector3, camDist: number) {
     const sim = this.sim;
     for (const sp of this.icons) sp.visible = false;
+    if (!this.show.bubbles) return;
     const show = camDist < 420;
     const cands: { a: Agent; d: number; e: string }[] = [];
     const R = Math.max(60, camDist * 0.55);
@@ -425,6 +432,7 @@ export class Vehicles {
     let best: { kind: 'agent' | 'rider' | 'ped' | 'cow'; id: number; dist: number } | null = null;
     for (const m of [...this.meshes, this.pedBody, this.cows]) m.computeBoundingSphere();
     for (let t = 0; t < this.meshes.length; t++) {
+      if (!this.meshes[t].visible) continue;
       const hits = ray.intersectObject(this.meshes[t], false);
       if (hits.length && hits[0].instanceId !== undefined) {
         const id = this.ids[t][hits[0].instanceId];
@@ -433,6 +441,7 @@ export class Vehicles {
       }
     }
     for (const [mesh, ids, kind] of [[this.pedBody, this.pedIds, 'ped'], [this.cows, this.cowIds, 'cow']] as const) {
+      if (!mesh.visible) continue;
       const hits = ray.intersectObject(mesh, false);
       if (hits.length && hits[0].instanceId !== undefined && (!best || hits[0].distance < best.dist)) best = { kind, id: ids[hits[0].instanceId], dist: hits[0].distance };
     }

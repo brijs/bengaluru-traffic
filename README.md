@@ -19,6 +19,8 @@ drivers, pedestrians and authorities **see** how each issue hurts the city — a
   sliders with what the simulation actually measures (speeds, crashes, injuries, near-misses, honks, stress).
 - Congestion colours on roads, honk bubbles (+ optional synthesized horns), crash bursts and pulsing crash rings,
   ambulances that do or don't get a green corridor, day/night with lit windows and headlights, rain and haze.
+- **👁 Show on map**: switch buildings, trees, landmarks, metro, vehicles, people, honks, habit/crash bubbles, issue markers (by category) and each kind of label on or off; remembered per browser.
+- **Rotate the map**: right-drag, Shift/⌘ + drag, two fingers, Q / E, the ⟲ ⟳ buttons, or drag the compass (click it for north up).
 - **English / ಕನ್ನಡ** toggle and a mobile layout (bottom sheet, touch pan / pinch / rotate).
 
 - **Who's in charge here?** A location pill follows the camera and opens the local body (one of GBA's five city

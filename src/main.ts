@@ -10,7 +10,7 @@ import { City } from './world/city';
 import { Vehicles } from './world/vehicles';
 import { HazardsView } from './world/hazardsView';
 import { Fx } from './world/fx';
-import { Labels } from './world/labels';
+import { Labels, type LabelKind } from './world/labels';
 import { CameraRig, type CamMode } from './world/camera';
 import { Audio } from './audio';
 import { UI, type Ctx } from './ui/ui';
@@ -97,6 +97,35 @@ hazView.onRemoved = (h, x, z) => {
   if (d < Math.max(200, rig.distance) && Math.random() < 0.7) { fx.sparkle(x, z, 0x69f0ae); if (Math.random() < 0.35) fx.text('✨ ' + t('fx.fixed'), x, z); }
 };
 
+// ───────────────────────────── Show on map layers (remembered per browser)
+const layers: Record<string, boolean> = {};
+try { Object.assign(layers, JSON.parse(localStorage.getItem('nr.layers') || '{}')); } catch { /* storage unavailable */ }
+function applyLayer(id: string, b: boolean) {
+  const [kind, sub] = id.split(':');
+  if (kind === 'cat') { if (b) hazView.hiddenCats.delete(sub); else hazView.hiddenCats.add(sub); return; }
+  if (kind === 'lbl') { if (b) labels.hidden.delete(sub as LabelKind); else labels.hidden.add(sub as LabelKind); return; }
+  switch (id) {
+    case 'buildings': city.buildings.visible = b; break;
+    case 'trees': city.trees.visible = b; break;
+    case 'landmarks': city.landmarks.visible = b; break;
+    case 'signs': city.signs.visible = b; break;
+    case 'metro': metro.group.visible = b; break;
+    case 'vehicles': vehicles.show.vehicles = b; break;
+    case 'people': vehicles.show.people = b; break;
+    case 'habits': vehicles.show.bubbles = b; break;
+    case 'honks': fx.show.honks = b; break;
+    case 'pops': fx.show.pops = b; break;
+    case 'rings': fx.show.rings = b; break;
+    case 'overlay': overlay = b; roads.overlayOn = b; break;
+    case 'markers': markers = b; hazView.markersOn = b; break;
+  }
+}
+const layerOn = (id: string) => layers[id] ?? true;
+function setLayer(id: string, b: boolean) {
+  layers[id] = b; applyLayer(id, b);
+  try { localStorage.setItem('nr.layers', JSON.stringify(layers)); } catch { /* ignore */ }
+}
+
 // ───────────────────────────── ctx for UI
 let speed = 1, overlay = true, markers = true, sound = false;
 const tmpV = new THREE.Vector3();
@@ -106,8 +135,9 @@ const ctx: Ctx = {
   setLevel(id, lv, quiet) { withDelta(() => sim.setLevel(id, lv)); if (!quiet) ui.refreshRow(id); },
   setLevels(lv) { withDelta(() => sim.setLevels(lv)); ui.refreshRows(); },
   get speed() { return speed; }, setSpeed(n) { speed = n; },
-  get overlay() { return overlay; }, setOverlay(b) { overlay = b; roads.overlayOn = b; },
-  get markers() { return markers; }, setMarkers(b) { markers = b; hazView.markersOn = b; },
+  get overlay() { return overlay; }, setOverlay(b) { setLayer('overlay', b); },
+  get markers() { return markers; }, setMarkers(b) { setLayer('markers', b); },
+  layer: layerOn, setLayer,
   get sound() { return sound; }, setSound(b) { sound = b; audio.enable(b); },
   setRain(b) { withDelta(() => sim.setRain(b)); ui.refreshRow('waterlogging'); },
   setEvent(b) { sim.env.event = b; },
@@ -172,6 +202,7 @@ const ctx: Ctx = {
   },
   rotate(dir) { rig.rotateBy(dir * Math.PI / 4); },
   northUp() { rig.northUp(); },
+  spin(d) { rig.spin(d); },
   azimuth: () => rig.azimuth(),
   depts,
   openSearch() { search.toggle(true); },
@@ -190,6 +221,7 @@ const ctx: Ctx = {
     }
   },
 };
+for (const id of Object.keys(layers)) applyLayer(id, layers[id]);
 const ui = new UI(ctx);
 
 // ───────────────────────────── search & simulated drive

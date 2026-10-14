@@ -18,6 +18,7 @@ export interface Ctx {
   speed: number; setSpeed(n: number): void;
   setOverlay(b: boolean): void; overlay: boolean;
   setMarkers(b: boolean): void; markers: boolean;
+  layer(id: string): boolean; setLayer(id: string, b: boolean): void;
   setSound(b: boolean): void; sound: boolean;
   setRain(b: boolean): void; setEvent(b: boolean): void;
   fixHazard(h: Hazard): void; worsenHazard(h: Hazard): void;
@@ -31,7 +32,7 @@ export interface Ctx {
   celebrate(x: number, z: number, txt: string): void;
   sparkleSlider(id: string): void;
   reset(): void;
-  rotate(dir: number): void; northUp(): void; azimuth(): number;
+  rotate(dir: number): void; northUp(): void; spin(delta: number): void; azimuth(): number;
   depts(): DeptScore[];
   quality: 'low' | 'med' | 'high'; setQuality(q: 'low' | 'med' | 'high'): void;
   openSearch(): void; volume: number; setVolume(v: number): void;
@@ -444,7 +445,10 @@ export class UI {
     fSpeed.onclick = () => { const sp = [1, 2, 5]; const i = sp.indexOf(ctx.speed); ctx.setSpeed(sp[(i + 1) % sp.length]); this.toast('⏩ ' + ctx.speed + '×'); };
     const fMore = h('button', 'btn glass fab', '⚙️');
     fMore.onclick = () => r.classList.toggle('expanded');
-    fabs.append(fCam, fPlay, fSpeed, fMore);
+    const fLay = h('button', 'btn glass fab', '👁');
+    fLay.title = t('lay.title');
+    fLay.onclick = () => this.layersPanel();
+    fabs.append(fCam, fPlay, fSpeed, fLay, fMore);
 
     const comp = h('div', 'box glass compass-box');
     comp.innerHTML = `<button class="mini" data-rot="-1" title="${t('rot.left')}">⟲</button>
@@ -455,7 +459,21 @@ export class UI {
       </svg></button>
       <button class="mini" data-rot="1" title="${t('rot.right')}">⟳</button>`;
     comp.querySelectorAll('[data-rot]').forEach((b) => ((b as HTMLElement).onclick = () => ctx.rotate(+(b as HTMLElement).dataset.rot!)));
-    (comp.querySelector('.compass') as HTMLElement).onclick = () => ctx.northUp();
+    // click the dial for north-up; drag it round to turn the map
+    const dial = comp.querySelector('.compass') as HTMLElement;
+    let drag: { a: number; moved: number } | null = null, dragged = false;
+    const angAt = (e: PointerEvent) => { const r = dial.getBoundingClientRect(); return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)); };
+    dial.addEventListener('pointerdown', (e) => { drag = { a: angAt(e), moved: 0 }; dragged = false; dial.setPointerCapture(e.pointerId); e.preventDefault(); });
+    dial.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const a = angAt(e);
+      let d = a - drag.a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+      drag.a = a; drag.moved += Math.abs(d);
+      if (drag.moved > 0.06) { dragged = true; ctx.spin(d); }
+    });
+    const end = () => { drag = null; };
+    dial.addEventListener('pointerup', end); dial.addEventListener('pointercancel', end);
+    dial.onclick = () => { if (!dragged) ctx.northUp(); dragged = false; };
     const cam = h('div', 'box glass collapsible');
     cam.append(h('h6', '', '🎥 ' + LK('Camera', 'ಕ್ಯಾಮೆರಾ')));
     const cams = h('div', 'cams');
@@ -490,17 +508,21 @@ export class UI {
 
     const tog = h('div', 'box glass collapsible');
     const tg = h('div', 'toggles');
-    const mkT = (icon: string, k: Key, on: () => boolean, fn: (b: boolean) => void) => {
+    const mkT = (icon: string, k: Key, on: () => boolean, fn: (b: boolean) => void, lay?: string) => {
       const b = h('button', 'btn' + (on() ? ' on' : ''), `${icon} ${t(k)}`);
+      if (lay) b.dataset.lay = lay;
       b.onclick = () => { fn(!on()); b.classList.toggle('on', on()); };
       return b;
     };
     tg.append(
       mkT('🌧️', 'tog.rain', () => ctx.sim.env.rain, (b) => ctx.setRain(b)),
       mkT('🏏', 'tog.event', () => ctx.sim.env.event, (b) => ctx.setEvent(b)),
-      mkT('🚥', 'tog.overlay', () => ctx.overlay, (b) => ctx.setOverlay(b)),
-      mkT('📍', 'tog.markers', () => ctx.markers, (b) => ctx.setMarkers(b)),
+      mkT('🚥', 'tog.overlay', () => ctx.overlay, (b) => ctx.setOverlay(b), 'overlay'),
+      mkT('📍', 'tog.markers', () => ctx.markers, (b) => ctx.setMarkers(b), 'markers'),
     );
+    const showBtn = h('button', 'btn show-btn', `👁 ${t('lay.title')}`);
+    showBtn.onclick = () => this.layersPanel();
+    tg.append(showBtn);
     const qs = h('div', 'speeds'); qs.style.gridTemplateColumns = 'repeat(3,1fr)'; qs.style.marginTop = '6px';
     for (const q of ['low', 'med', 'high'] as const) {
       const b = h('button', 'btn' + (ctx.quality === q ? ' on' : ''), t(('q.' + q) as Key));
@@ -519,6 +541,61 @@ export class UI {
     r.append(comp, fabs, cam, time, tog, leg);
     this.els.right = r;
     return r;
+  }
+
+  // ───────────────────────────── Show on map
+  private layersEl: HTMLElement | null = null;
+  layersPanel() {
+    if (this.layersEl?.isConnected) { this.layersEl.remove(); this.layersEl = null; return; }
+    const ctx = this.ctx;
+    const groups: [string, [string, string, string, string][]][] = [
+      [LK('City', 'ನಗರ'), [
+        ['buildings', '🏢', 'Buildings', 'ಕಟ್ಟಡಗಳು'], ['trees', '🌳', 'Trees', 'ಮರಗಳು'], ['landmarks', '🏛️', 'Landmarks', 'ಹೆಗ್ಗುರುತುಗಳು'],
+        ['metro', '🚇', 'Metro', 'ಮೆಟ್ರೋ'], ['signs', '🪧', 'Exit signboards', 'ನಿರ್ಗಮನ ಫಲಕಗಳು'],
+      ]],
+      [LK('Traffic', 'ಸಂಚಾರ'), [
+        ['vehicles', '🚗', 'Vehicles', 'ವಾಹನಗಳು'], ['people', '🚶', 'People & cows', 'ಜನರು ಮತ್ತು ಹಸುಗಳು'], ['overlay', '🚥', 'Traffic colours', 'ಸಂಚಾರ ಬಣ್ಣಗಳು'],
+      ]],
+      [LK('Bubbles', 'ಗುಳ್ಳೆಗಳು'), [
+        ['honks', '📢', 'Honks', 'ಹಾರ್ನ್'], ['habits', '📱', 'Driver habits', 'ಚಾಲಕರ ಅಭ್ಯಾಸ'],
+        ['pops', '💥', 'Crash & near-miss pops', 'ಅಪಘಾತ ಮತ್ತು ತಪ್ಪಿದ ಅಪಘಾತ'], ['rings', '⭕', 'Crash-site rings', 'ಅಪಘಾತ ಸ್ಥಳದ ವೃತ್ತ'],
+      ]],
+      [LK('Issue markers', 'ಸಮಸ್ಯೆ ಗುರುತುಗಳು'), [
+        ['markers', '📍', 'All issue markers', 'ಎಲ್ಲಾ ಸಮಸ್ಯೆ ಗುರುತುಗಳು'],
+        ...(Object.entries(CATEGORIES) as [string, { en: string; kn: string; icon: string }][]).map(([id, c]) => ['cat:' + id, c.icon, c.en, c.kn] as [string, string, string, string]),
+      ]],
+      [LK('Labels', 'ಹೆಸರುಗಳು'), [
+        ['lbl:area', '🏘️', 'Areas', 'ಪ್ರದೇಶಗಳು'], ['lbl:road', '🛣️', 'Road names', 'ರಸ್ತೆ ಹೆಸರುಗಳು'], ['lbl:lm', '📌', 'Landmark names', 'ಹೆಗ್ಗುರುತು ಹೆಸರುಗಳು'],
+        ['lbl:node', '✳️', 'Junctions', 'ಜಂಕ್ಷನ್‌ಗಳು'], ['lbl:dest', '➜', 'Highway destinations', 'ಹೆದ್ದಾರಿ ಗಮ್ಯಸ್ಥಾನಗಳು'], ['lbl:stn', 'Ⓜ️', 'Metro stations', 'ಮೆಟ್ರೋ ನಿಲ್ದಾಣಗಳು'],
+      ]],
+    ];
+    const all = groups.flatMap(([, items]) => items.map((i) => i[0]));
+    const p = h('div', 'layers-pop glass');
+    p.innerHTML = `<div class="ch"><h3>👁 ${t('lay.title')}</h3><button class="mini" data-close>✕</button></div>
+      <div class="lay-all"><button class="btn" data-all="1">${LK('Show all', 'ಎಲ್ಲ ತೋರಿಸಿ')}</button><button class="btn" data-all="0">${LK('Hide all', 'ಎಲ್ಲ ಮರೆಮಾಡಿ')}</button></div>` +
+      groups.map(([g, items]) => `<h6>${esc(g)}</h6><div class="lay-grid">${items.map(([id, ic, en, kn]) => `<button class="lay${id === 'markers' ? ' wide' : ''}" data-id="${id}"><i>${ic}</i><span>${esc(LK(en, kn))}</span></button>`).join('')}</div>`).join('');
+    const sync = () => {
+      p.querySelectorAll<HTMLElement>('[data-id]').forEach((b) => {
+        const id = b.dataset.id!;
+        b.classList.toggle('on', ctx.layer(id));
+        b.classList.toggle('dim', id.startsWith('cat:') && !ctx.layer('markers'));
+      });
+      this.els.right?.querySelectorAll<HTMLElement>('[data-lay]').forEach((b) => b.classList.toggle('on', ctx.layer(b.dataset.lay!)));
+    };
+    p.querySelectorAll<HTMLElement>('[data-id]').forEach((b) => (b.onclick = () => {
+      const id = b.dataset.id!;
+      // picking a category while all markers are off turns markers back on, showing just that category
+      if (id.startsWith('cat:') && !ctx.layer('markers')) {
+        ctx.setLayer('markers', true);
+        for (const c of Object.keys(CATEGORIES)) ctx.setLayer('cat:' + c, 'cat:' + c === id);
+      } else ctx.setLayer(id, !ctx.layer(id));
+      sync();
+    }));
+    p.querySelectorAll<HTMLElement>('[data-all]').forEach((b) => (b.onclick = () => { for (const id of all) ctx.setLayer(id, b.dataset.all === '1'); sync(); }));
+    (p.querySelector('[data-close]') as HTMLElement).onclick = () => this.layersPanel();
+    sync();
+    this.root.append(p);
+    this.layersEl = p;
   }
 
   camChanged(m: CamMode) { this.els.cams?.querySelectorAll('button[data-cam]').forEach((b) => b.classList.toggle('on', (b as HTMLElement).dataset.cam === m)); }

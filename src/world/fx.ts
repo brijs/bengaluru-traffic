@@ -18,6 +18,8 @@ export class Fx {
   onCrash?: (x: number, z: number, kind: string) => void;
   onEvent?: (type: string, x: number, z: number, a?: number) => void;
   private honkWords: string[] = [];
+  /** Show on map switches. */
+  show = { honks: true, pops: true, rings: true };
 
   constructor(private sim: Sim) {
     for (let i = 0; i < 70; i++) {
@@ -81,7 +83,7 @@ export class Fx {
       this.onEvent?.(f.type, f.x, f.z, f.a);
       switch (f.type) {
         case 'honk':
-          if (near && honkSpawn < (camDist < 120 ? 2 : 5) && camDist < 900 && (camDist > 120 || this.activeHonks() < 3)) {
+          if (this.show.honks && near && honkSpawn < (camDist < 120 ? 2 : 5) && camDist < 900 && (camDist > 120 || this.activeHonks() < 3)) {
             honkSpawn++;
             const w = this.honkWords[Math.floor(Math.random() * this.honkWords.length)];
             const close = camDist < 60;
@@ -92,22 +94,22 @@ export class Fx {
           break;
         case 'crash':
           this.onCrash?.(f.x, f.z, f.txt ?? '');
-          if (near) { const s = Math.max(7, camDist * 0.03); this.pop(emojiTex('💥'), f.x, 3, f.z, 1.4, s * 0.4, s * 1.4, 1.5); this.sparkle(f.x, f.z, 0xff8a00); }
+          if (near && this.show.pops) { const s = Math.max(7, camDist * 0.03); this.pop(emojiTex('💥'), f.x, 3, f.z, 1.4, s * 0.4, s * 1.4, 1.5); this.sparkle(f.x, f.z, 0xff8a00); }
           break;
         case 'near':
-          if (near && camDist < 260) this.pop(emojiTex('❗'), f.x, 4, f.z, 0.7, 1.8, 3, 3);
+          if (near && this.show.pops && camDist < 260) this.pop(emojiTex('❗'), f.x, 4, f.z, 0.7, 1.8, 3, 3);
           break;
         case 'scare':
-          if (near && camDist < 300) this.pop(emojiTex('😱'), f.x, 3, f.z, 0.9, 1.6, 2.6, 2);
+          if (near && this.show.pops && camDist < 300) this.pop(emojiTex('😱'), f.x, 3, f.z, 0.9, 1.6, 2.6, 2);
           break;
         case 'cleared':
           if (near) { this.sparkle(f.x, f.z, 0x80deea); }
           break;
         case 'tow':
-          if (near) { this.text('🛻 ' + t('fx.towed'), f.x, f.z, '#475569'); this.sparkle(f.x, f.z, 0xb0bec5); }
+          if (near && this.show.pops) { this.text('🛻 ' + t('fx.towed'), f.x, f.z, '#475569'); this.sparkle(f.x, f.z, 0xb0bec5); }
           break;
         case 'dispatch':
-          if (near) this.text('🚑 ' + t('fx.amb'), f.x, f.z, '#dc2626');
+          if (near && this.show.pops) this.text('🚑 ' + t('fx.amb'), f.x, f.z, '#dc2626');
           break;
         case 'arrive':
           if (near) this.sparkle(f.x, f.z, 0xff5252);
@@ -143,7 +145,7 @@ export class Fx {
     // persistent rings at active crash sites
     let k = 0;
     for (const c of sim.crashes) {
-      if (c.cleared || k >= this.rings.length) continue;
+      if (!this.show.rings || c.cleared || k >= this.rings.length) continue;
       const ring = this.rings[k], ic = this.ringIcons[k];
       const base = Math.max(5, camDist * 0.016);
       const ph = (wallT * 1.4 + c.id * 0.3) % 1;

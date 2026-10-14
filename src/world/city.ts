@@ -80,6 +80,8 @@ function windowMaterial(night: { value: number }) {
 
 export class City {
   group = new THREE.Group();
+  /** Toggleable layers (Show on map). */
+  buildings = new THREE.Group(); trees = new THREE.Group(); landmarks = new THREE.Group(); signs = new THREE.Group();
   private trains: { line: number; u: number; dir: number; mesh: THREE.Group; len: number; cum: number[]; pts: [number, number][]; y: number; under?: [number, number] }[] = [];
   stadiumLights: THREE.Mesh[] = [];
   private stadiumGlow: THREE.Sprite[] = [];
@@ -89,6 +91,7 @@ export class City {
 
   constructor(private net: Network, night: { value: number }) {
     this.roads = new RoadIndex(net);
+    this.group.add(this.buildings, this.trees, this.landmarks, this.signs);
     this.buildGreens();
     this.buildBuildings(night);
     this.buildTrees();
@@ -139,7 +142,7 @@ export class City {
       sign.position.set(p.x, 7 + H / 2, p.z);
       // face drivers heading out of town (sign normal points back along the road)
       sign.rotation.y = Math.atan2(-p.dx, -p.dz);
-      this.group.add(sign);
+      this.signs.add(sign);
     }
   }
 
@@ -216,17 +219,17 @@ export class City {
     const box = new THREE.BoxGeometry(1, 1, 1);
     const im = new THREE.InstancedMesh(box, windowMaterial(night), mats.length);
     mats.forEach((m, i) => { im.setMatrixAt(i, m); im.setColorAt(i, cols[i]); });
-    this.group.add(im);
+    this.buildings.add(im);
     // Sintex-style black water tanks on rooftops
     const tankG = new THREE.CylinderGeometry(0.75, 0.75, 1.3, 8);
     const ti = new THREE.InstancedMesh(tankG, new THREE.MeshLambertMaterial({ color: 0x202020 }), tanks.length);
     tanks.forEach((m, i) => ti.setMatrixAt(i, m));
-    this.group.add(ti);
+    this.buildings.add(ti);
     // Mangalore-tile roofs
     const roofG = new THREE.ConeGeometry(0.72, 1, 4, 1); roofG.rotateY(Math.PI / 4);
     const ri = new THREE.InstancedMesh(roofG, new THREE.MeshLambertMaterial({ color: 0xb5532f }), roofs.length);
     roofs.forEach((m, i) => ri.setMatrixAt(i, m));
-    this.group.add(ri);
+    this.buildings.add(ri);
   }
 
   private treeMats: THREE.Matrix4[] = []; private treeCols: THREE.Color[] = []; private trunkMats: THREE.Matrix4[] = [];
@@ -281,7 +284,7 @@ export class City {
     const trunk = new THREE.CylinderGeometry(0.22, 0.32, 1, 5);
     const tk = new THREE.InstancedMesh(trunk, new THREE.MeshLambertMaterial({ color: 0x6b4f35 }), this.trunkMats.length);
     this.trunkMats.forEach((m, i) => tk.setMatrixAt(i, m));
-    this.group.add(ci, tk);
+    this.trees.add(ci, tk);
   }
 
   private ellipse(lm: Landmark, color: number, y: number, grow = 0, mat?: THREE.Material) {
@@ -323,7 +326,7 @@ export class City {
     const m = new THREE.Mesh(geo, opts.mat ?? new THREE.MeshLambertMaterial({ color }));
     m.position.set(x, y, z);
     if (opts.ry) m.rotation.y = opts.ry;
-    this.group.add(m);
+    this.landmarks.add(m);
     return m;
   }
 
@@ -364,7 +367,7 @@ export class City {
             this.stadiumLights.push(head);
             const gl = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,255,230,1)', 'rgba(255,255,200,0)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
             gl.position.set(px, 26.5, pz); gl.scale.set(22, 22, 1); gl.visible = false;
-            this.stadiumGlow.push(gl); this.group.add(gl);
+            this.stadiumGlow.push(gl); this.landmarks.add(gl);
           }
           break;
         }
