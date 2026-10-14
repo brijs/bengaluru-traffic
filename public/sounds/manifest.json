@@ -1,0 +1,169 @@
+{
+ "clips": {
+  "air-horn": [
+   [
+    0.36,
+    1.74
+   ]
+  ],
+  "car-sharp": [
+   [
+    0.06,
+    0.22
+   ]
+  ],
+  "car-horn-1": [
+   [
+    1.26,
+    1.36
+   ]
+  ],
+  "car-horn-2": [
+   [
+    0.08,
+    0.16
+   ],
+   [
+    0.44,
+    1.8
+   ],
+   [
+    6.96,
+    0.46
+   ],
+   [
+    7.54,
+    0.16
+   ]
+  ],
+  "car-honks": [
+   [
+    0,
+    0.26
+   ],
+   [
+    1.46,
+    0.5
+   ],
+   [
+    2.52,
+    0.46
+   ]
+  ],
+  "car-two-beeps": [
+   [
+    0.12,
+    0.14
+   ],
+   [
+    0.34,
+    0.14
+   ]
+  ],
+  "truck-honks": [
+   [
+    0.1,
+    1.8
+   ],
+   [
+    5.0,
+    1.8
+   ],
+   [
+    12.26,
+    1.8
+   ],
+   [
+    17.06,
+    1.8
+   ],
+   [
+    21.78,
+    1.8
+   ]
+  ],
+  "bus-horn": [
+   [
+    0.12,
+    0.28
+   ],
+   [
+    0.5,
+    0.44
+   ],
+   [
+    1.28,
+    1.26
+   ],
+   [
+    3.72,
+    1.8
+   ],
+   [
+    6.3,
+    0.38
+   ]
+  ],
+  "truck-horn": [
+   [
+    0.08,
+    0.42
+   ]
+  ],
+  "car-horn-3": [
+   [
+    0,
+    1.32
+   ]
+  ],
+  "beep-beep": [
+   [
+    0.48,
+    0.4
+   ],
+   [
+    1.18,
+    0.16
+   ],
+   [
+    1.46,
+    0.2
+   ]
+  ]
+ },
+ "groups": {
+  "bike": [
+   "beep-beep",
+   "car-two-beeps",
+   "car-sharp"
+  ],
+  "auto": [
+   "beep-beep",
+   "car-two-beeps",
+   "car-honks"
+  ],
+  "car": [
+   "car-horn-1",
+   "car-horn-2",
+   "car-honks",
+   "car-horn-3",
+   "car-sharp",
+   "car-two-beeps"
+  ],
+  "bus": [
+   "bus-horn",
+   "air-horn"
+  ],
+  "truck": [
+   "truck-horn",
+   "truck-honks",
+   "air-horn",
+   "bus-horn"
+  ]
+ },
+ "siren": "ambulance-siren",
+ "ambience": [
+  "ambience-indian-street",
+  "ambience-bengaluru-tuktuk"
+ ]
+}
