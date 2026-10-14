@@ -56,8 +56,12 @@ export class Labels {
     this.items.push({ obj, el, kind, name, icon, minD, maxD });
   }
 
-  addStations(st: { x: number; z: number; name: string }[]) {
-    for (const s of st) if (s.name) this.add('stn', { en: s.name, kn: s.name }, s.x, 18, s.z, 0, 260, 'Ⓜ️');
+  addStations(st: { x: number; z: number; name: string; kn?: string; open?: boolean; color?: number }[]) {
+    for (const s of st) {
+      if (!s.name) continue;
+      this.add('stn', { en: s.name, kn: s.kn || s.name }, s.x, 18, s.z, 0, 320, s.open === false ? '🚧' : 'Ⓜ️');
+      if (s.color !== undefined) this.items[this.items.length - 1].el.style.borderLeft = `4px solid #${s.color.toString(16).padStart(6, '0')}`;
+    }
     this.refresh();
   }
 

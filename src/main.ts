@@ -45,7 +45,7 @@ const castAll = (g: THREE.Object3D, receive: boolean) => g.traverse((o) => {
   m.receiveShadow = receive;
 });
 castAll(city.group, true); castAll(vehicles.group, false); castAll(hazView.group, false);
-roads.group.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.receiveShadow = true; m.castShadow = (m as any).isInstancedMesh; } });
+roads.group.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.receiveShadow = true; m.castShadow = (m as any).isInstancedMesh && !(m.material as THREE.Material).transparent; } });
 const reShadowHazards = () => castAll(hazView.group, false);
 
 // ───────────────────────────── score

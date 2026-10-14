@@ -78,7 +78,8 @@ button { font: inherit; color: inherit; }
 }
 .lbl-dest { font-size: 12.5px; color: #fff; background: #0b6b3a; border: 2px solid #fff; padding: 2px 9px; border-radius: 5px; text-shadow: none; box-shadow: 0 2px 6px rgba(0,0,0,.45); }
 .lbl-dest .ic { margin-right: 5px; }
-.lbl-stn { font-size: 10.5px; color: #fff; background: rgba(88,28,135,.8); padding: 1px 6px; border-radius: 6px; text-shadow: none; }
+.lbl-stn { font-size: 10.5px; color: #fff; background: rgba(15,23,42,.78); padding: 1px 6px 1px 5px; border-radius: 5px; text-shadow: none; white-space: nowrap; }
+.lbl-stn .ic { margin-right: 3px; font-size: 9.5px; }
 .lbl-node { font-size: 11px; color: #e2e8f0; background: rgba(2,6,23,.65); padding: 1px 6px; border-radius: 6px; text-shadow: none; }
 
 /* glass panels */

@@ -35,7 +35,7 @@ interface Train { curve: THREE.CatmullRomCurve3; len: number; u: number; dir: nu
 
 export class Metro {
   group = new THREE.Group();
-  stations: { x: number; z: number; name: string; line: string }[] = [];
+  stations: { x: number; z: number; name: string; kn?: string; line: string; open: boolean; color: number }[] = [];
   private trains: Train[] = [];
 
   constructor() {
@@ -102,7 +102,7 @@ export class Metro {
     for (const st of line.stations) {
       const t = this.nearestT(curve, samples, N, st.x, st.z);
       const iu = Math.round(t * N);
-      if (under[iu]) { this.stations.push({ ...st, line: line.id }); continue; }
+      if (under[iu]) { this.stations.push({ ...st, line: line.id, open, color: line.color }); continue; }
       const p = curve.getPointAt(t), tg = curve.getTangentAt(t);
       const g = new THREE.Group();
       const plat = new THREE.Mesh(new THREE.BoxGeometry(18, 0.6, 9), platM); plat.position.y = -0.4;
@@ -113,7 +113,7 @@ export class Metro {
       g.rotation.y = -Math.atan2(tg.z, tg.x);
       g.traverse((o) => { (o as THREE.Mesh).castShadow = true; });
       this.group.add(g);
-      this.stations.push({ ...st, line: line.id });
+      this.stations.push({ ...st, line: line.id, open, color: line.color });
     }
     if (!open) return;
     // trains: 3 cars, each placed on the curve at its own offset so they bend through curves

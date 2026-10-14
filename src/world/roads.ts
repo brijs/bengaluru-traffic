@@ -24,6 +24,12 @@ class Builder {
     this.idx.push(s, s + 1, s + 2, s, s + 2, s + 3);
     if (this.key) this.mark(s);
   }
+  /** Upward-facing triangle (winding fixed automatically). */
+  tri(a: number[], b: number[], c: number[], color: number[]) {
+    const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+    if (ny < 0) this.quad(a, c, b, b, color, [0, 0, 1, 0, 1, 1, 1, 1]);
+    else this.quad(a, b, c, c, color, [0, 0, 1, 0, 1, 1, 1, 1]);
+  }
   // Ribbon along a polyline between lateral offsets la..lb (left-positive) at height y.
   ribbon(pts: Float64Array, la: number, lb: number, y: number, color: number[], uvScale = 0, s0 = 0, s1 = 1e9) {
     const n = pts.length / 2;
@@ -105,6 +111,7 @@ export class Roads {
   overlay: THREE.Mesh;
   private footT: Toggle; private markT: Toggle; private zebraT: Toggle;
   private segOf: { start: number; n: number; seg: number }[] = [];
+  private juncOv: { start: number; n: number; arms: [number, number][] }[] = [];
   private segV: Float32Array; private segSum: Float32Array; private segCnt: Float32Array;
   private lamps: THREE.InstancedMesh; private lampHeads: THREE.InstancedMesh; private lampGlow: THREE.InstancedMesh;
   private lampEdge: number[] = []; private lampMat: THREE.Matrix4[] = [];
@@ -166,13 +173,60 @@ export class Roads {
       this.zebraOrder.push(nd.id);
     }
     this.zebraOrder.sort(() => rnd() - 0.5);
-    // junction discs
-    const discG: THREE.BufferGeometry[] = [];
+    const juncRings: { x: number; z: number; ring: [number, number][]; tris: number[][]; arms: [number, number][] }[] = [];
+    // junctions: asphalt shaped from the arms that meet there, with curved kerb returns and footpath corners
     for (const nd of net.nodes) {
-      const c = new THREE.CircleGeometry(nd.r + 0.5, 28);
-      c.rotateX(-Math.PI / 2);
-      c.translate(nd.x, 0.035, nd.z);
-      discG.push(c);
+      if (nd.kind === 'end' || nd.outs.length < 2) continue;
+      const arms = nd.outs.map((li) => {
+        const l = net.links[li], p = net.pose(l, 0, 0);
+        return { l, x: p.x, z: p.z, dx: p.dx, dz: p.dz, nx: p.dz, nz: -p.dx, hw: l.halfW, ang: Math.atan2(p.dz, p.dx) };
+      }).sort((a, b) => a.ang - b.ang);
+      const major = arms.some((a) => a.l.road.major || a.l.road.ring);
+      const col = major ? ASPHALT_MAJOR : ASPHALT;
+      // a curve from point A (heading inward along -da) to B (heading inward along -db): quadratic through the kerb-line intersection
+      const curve = (ax: number, az: number, dax: number, daz: number, bx: number, bz: number, dbx: number, dbz: number, n: number) => {
+        const det = dax * -dbz + dbx * daz; // solve A + t·da = B + u·db
+        let cx = (ax + bx) / 2, cz = (az + bz) / 2;
+        if (Math.abs(det) > 0.08) {
+          const rx = bx - ax, rz = bz - az;
+          const t = (rx * -dbz + dbx * rz) / det, u = (dax * rz - daz * rx) / det;
+          if (t < 0.5 && u < 0.5 && t > -nd.r * 0.95 && u > -nd.r * 0.95) { cx = ax + dax * t; cz = az + daz * t; }
+        }
+        const out: [number, number][] = [];
+        for (let k = 0; k <= n; k++) {
+          const q = k / n, w0 = (1 - q) * (1 - q), w1 = 2 * q * (1 - q), w2 = q * q;
+          out.push([w0 * ax + w1 * cx + w2 * bx, w0 * az + w1 * cz + w2 * bz]);
+        }
+        return out;
+      };
+      const ring: [number, number][] = [];
+      for (let i = 0; i < arms.length; i++) {
+        const A = arms[i], B = arms[(i + 1) % arms.length];
+        // A's side facing B is its right (-n); B's side facing A is its left (+n)
+        const ra = [A.x - A.nx * A.hw, A.z - A.nz * A.hw], lb = [B.x + B.nx * B.hw, B.z + B.nz * B.hw];
+        ring.push([A.x + A.nx * A.hw, A.z + A.nz * A.hw], [ra[0], ra[1]]);
+        const inner = curve(ra[0], ra[1], A.dx, A.dz, lb[0], lb[1], B.dx, B.dz, 8);
+        ring.push(...inner.slice(1, -1));
+        // footpath corner between the two arms
+        const fw = A.hw + FOOT_W, fwb = B.hw + FOOT_W;
+        const outer = curve(A.x - A.nx * fw, A.z - A.nz * fw, A.dx, A.dz, B.x + B.nx * fwb, B.z + B.nz * fwb, B.dx, B.dz, 8);
+        footB.begin('');
+        for (let k = 0; k < 8; k++) {
+          const a = inner[k], b = inner[k + 1], c = outer[k + 1], d = outer[k];
+          footB.tri([a[0], 0.2, a[1]], [b[0], 0.2, b[1]], [c[0], 0.2, c[1]], FOOT);
+          footB.tri([a[0], 0.2, a[1]], [c[0], 0.2, c[1]], [d[0], 0.2, d[1]], FOOT);
+        }
+        kerbB.begin('');
+        kerbB.wall(Float64Array.from(inner.flat()), 0, 0.03, 0.2, [1, 1, 1]);
+      }
+      // earcut handles concave outlines without the overlaps a centre fan gives
+      const tris = THREE.ShapeUtils.triangulateShape(ring.map(([x, z]) => new THREE.Vector2(x, z)), []);
+      roadB.begin('');
+      for (const [i0, i1, i2] of tris) {
+        const a = ring[i0], b = ring[i1], c = ring[i2];
+        roadB.tri([a[0], 0.03, a[1]], [b[0], 0.03, b[1]], [c[0], 0.03, c[1]], col);
+      }
+      juncRings.push({ x: nd.x, z: nd.z, ring, tris, arms: arms.map((a) => [a.l.rev, a.l.id] as [number, number]) });
     }
     // overlay segments
     for (const l of net.links) {
@@ -186,6 +240,15 @@ export class Roads {
       }
       this.segOf.push({ start, n: nSeg, seg: l.len / nSeg });
     }
+    // junction overlay: each vertex takes the colour of its nearest arm, the centre the average
+    for (const j of juncRings) {
+      const start = ovB.pos.length / 3;
+      for (const [i0, i1, i2] of j.tris) {
+        const a = j.ring[i0], b = j.ring[i1], c = j.ring[i2];
+        ovB.tri([a[0], 0.09, a[1]], [b[0], 0.09, b[1]], [c[0], 0.09, c[1]], hex(0x22c55e));
+      }
+      this.juncOv.push({ start, n: ovB.pos.length / 3 - start, arms: j.arms });
+    }
     const totalSeg = this.segOf.reduce((a, b) => a + b.n, 0);
     this.segV = new Float32Array(totalSeg).fill(1);
     this.segSum = new Float32Array(totalSeg);
@@ -194,8 +257,6 @@ export class Roads {
     const asphalt = asphaltTex();
     const roadGeo = roadB.build(); worldUV(roadGeo, 9);
     const roadMesh = new THREE.Mesh(roadGeo, new THREE.MeshLambertMaterial({ vertexColors: true, map: asphalt }));
-    const discGeo = mergeGeometries(discG); worldUV(discGeo, 14);
-    this.group.add(new THREE.Mesh(discGeo, new THREE.MeshLambertMaterial({ color: 0x55585e, map: asphalt })));
     const dirtGeo = dirtB.build(); worldUV(dirtGeo, 6);
     const dirtMesh = new THREE.Mesh(dirtGeo, new THREE.MeshLambertMaterial({ vertexColors: true, map: dirtTex() }));
     dirtMesh.matrixAutoUpdate = false; this.group.add(dirtMesh);
@@ -381,6 +442,20 @@ export class Roads {
           const o = (so.start + k * 4 + q) * 4;
           arr[o] = this.tc.r; arr[o + 1] = this.tc.g; arr[o + 2] = this.tc.b; arr[o + 3] = alpha;
         }
+      }
+    }
+    for (const j of this.juncOv) {
+      const av = j.arms.map(([inL, outL]) => {
+        const si = this.segOf[inL];
+        return (this.segV[baseOf[inL] + si.n - 1] + this.segV[baseOf[outL]]) / 2;
+      });
+      const mean = av.reduce((x, y) => x + y, 0) / av.length;
+      // one even colour per junction (per-arm gradients show the fan's triangles)
+      this.ramp(mean, this.tc);
+      const alpha = this.alphaRamp(mean, far, nightK) * closeK;
+      for (let q = 0; q < j.n; q++) {
+        const o = (j.start + q) * 4;
+        arr[o] = this.tc.r; arr[o + 1] = this.tc.g; arr[o + 2] = this.tc.b; arr[o + 3] = alpha;
       }
     }
     col.needsUpdate = true;

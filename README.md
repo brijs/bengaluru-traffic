@@ -39,6 +39,11 @@ drivers, pedestrians and authorities **see** how each issue hurts the city — a
   Blue (airport) under construction, drawn as smooth splines with stations. Refresh with `node scripts/fetch-metro.mjs`
   (needs a responsive Overpass server; the committed `src/data/metro.json` was built 2026-10-14, with underground sections
   in the city core approximated).
+- **Metro station names** in English and Kannada from Wikidata (CC0), matched to station positions by
+  `node scripts/name-stations.mjs`; under-construction Pink/Blue stations are marked 🚧. Toggle them under
+  👁 Show on map → Labels → Metro stations. Some stations have no Kannada label on Wikidata yet and show in English.
+- **Junctions** are shaped from the roads that meet there (curved kerb returns, continuous footpaths) and carry the
+  traffic colours of their arms.
 - **Traffic volume** slider (30–180%) in the World panel.
 - Bilingual NH-style highway signs on every exit road (Hosur, Hoskote, Mysuru, Tumakuru, Kanakapura, Magadi, airport…).
 - Real CC0 horn recordings per vehicle type that fade as you zoom out (credits in `public/sounds/CREDITS.md`).

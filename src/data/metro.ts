@@ -1,4 +1,5 @@
-// Namma Metro lines from OpenStreetMap (regenerate with `node scripts/fetch-metro.mjs`).
+// Namma Metro lines from OpenStreetMap (regenerate with `node scripts/fetch-metro.mjs`);
+// station names (English + Kannada) from Wikidata (`node scripts/name-stations.mjs`).
 // Status checked against news reports, Oct 2026: Purple, Green, Yellow open; Pink and Blue under construction
 // (Pink's elevated stretch was due to open around Aug–Oct 2026 — flip `status` when it does).
 import raw from './metro.json';
@@ -6,7 +7,7 @@ import raw from './metro.json';
 export interface MetroLineData {
   id: string; en: string; kn: string; color: number; status: 'open' | 'construction';
   pts: [number, number, number][]; // x, z, underground(1/0)
-  stations: { x: number; z: number; name: string }[];
+  stations: { x: number; z: number; name: string; kn?: string }[];
 }
 
 const META: Record<string, { en: string; kn: string; color: number }> = {
